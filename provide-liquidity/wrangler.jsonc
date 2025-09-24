@@ -1,0 +1,25 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "dc-provide-liquidity",
+  "main": "src/worker.ts",
+  "compatibility_date": "2024-11-01",
+  "triggers": { "crons": ["0 * * * *"] }, // hourly :00
+  "vars": {
+    "TARGET_URL": "https://staging-daichronicles.netlify.app/api/internal/provide-liquidity"
+  },
+  "env": {
+    "staging": {
+      "triggers": { "crons": ["0 * * * *"] },
+      "vars": {
+        "TARGET_URL": "https://staging-daichronicles.netlify.app/api/internal/provide-liquidity"
+      }
+    },
+    "production": {
+      "triggers": { "crons": ["0 * * * *"] },
+      "vars": {
+        "TARGET_URL": "https://daichronicles.io/api/internal/provide-liquidity"
+      }
+    }
+  },
+  "observability": { "enabled": true }
+}

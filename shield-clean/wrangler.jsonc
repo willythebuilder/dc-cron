@@ -1,0 +1,25 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "dc-shield-clean",
+  "main": "src/worker.ts",
+  "compatibility_date": "2024-11-01",
+  "triggers": { "crons": ["*/15 * * * *"] }, // every 15 minutes
+  "vars": {
+    "TARGET_URL": "https://staging-daichronicles.netlify.app/api/internal/shield-clean"
+  },
+  "env": {
+    "staging": {
+      "triggers": { "crons": ["*/15 * * * *"] },
+      "vars": {
+        "TARGET_URL": "https://staging-daichronicles.netlify.app/api/internal/shield-clean"
+      }
+    },
+    "production": {
+      "triggers": { "crons": ["*/15 * * * *"] },
+      "vars": {
+        "TARGET_URL": "https://daichronicles.io/api/internal/shield-clean"
+      }
+    }
+  },
+  "observability": { "enabled": true }
+}
