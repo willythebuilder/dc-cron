@@ -1,12 +1,8 @@
-Here’s a ready-to-drop **`README.md`** for your `dc-cron` repo. It documents installation, project structure, usage (dev/test/deploy), and your new **feature flag toggle** approach for enabling/disabling prod workers.
 
----
+# DaiChronicles Cron Worker
 
-```markdown
-# DaiChronicles Cron Workers
-
-This repo contains **Cloudflare Workers + Cron Triggers** that periodically call internal API endpoints of [DaiChronicles](https://daichronicles.io).  
-Each job is deployed as its **own Worker**, with its own cron schedule, staging and production configs, and secrets.
+This repo contains a **single Cloudflare Worker + Cron Triggers** that periodically call internal API endpoints of [DaiChronicles](https://daichronicles.io).  
+All jobs are managed in one Worker, with a global feature flag and separate staging/production environments.
 
 ---
 
@@ -15,36 +11,17 @@ Each job is deployed as its **own Worker**, with its own cron schedule, staging 
 ```
 
 dc-cron/
-package.json
-tsconfig.json
-.gitignore
-create-daily-chronicles/
-wrangler.jsonc
-src/worker.ts
-process-incomplete-chronicles/
-wrangler.jsonc
-src/worker.ts
-sync-chronicles-updates/
-wrangler.jsonc
-src/worker.ts
-sync-user-stakes/
-wrangler.jsonc
-src/worker.ts
-provide-liquidity/
-wrangler.jsonc
-src/worker.ts
-shield-clean/
-wrangler.jsonc
-src/worker.ts
-record-dac-performance/
-wrangler.jsonc
-src/worker.ts
+    package.json
+    tsconfig.json
+    .gitignore
+    wrangler.jsonc
+    src/
+        worker.ts
 
 ````
 
-- **One worker per job** → easier isolation and toggling.
-- Each worker shares the same `src/worker.ts` template.
-- Schedules are defined in each `wrangler.jsonc`.
+- **One Worker handles all jobs** → simpler to manage, fewer moving parts.
+- Schedules are defined in `wrangler.jsonc`.
 - Environments:
   - **staging** → `https://staging-daichronicles.netlify.app`
   - **production** → `https://daichronicles.io`
@@ -53,12 +30,12 @@ src/worker.ts
 
 ## 🛠 Installation
 
-1. Install Node 18+ and npm/pnpm.
-2. Install Wrangler (global or via npx):
+1. Install Node.js 18+ and npm or pnpm.
+2. Install Wrangler (globally or via `npx`):
    ```bash
    npm i -g wrangler@latest
    wrangler login
-````
+    ```
 
 3. Clone this repo:
 
@@ -72,15 +49,15 @@ src/worker.ts
 
 ## ▶️ Development & Local Testing
 
-Each worker can be run locally and its cron simulated.
-
-Example (sync-chronicles-updates):
+Run the Worker locally with cron simulation:
 
 ```bash
-npm run dev:sync-updates
+npm run dev
 ```
 
-Wrangler starts at `http://127.0.0.1:8787`. To simulate the cron:
+Wrangler starts at `http://127.0.0.1:8787`.
+
+Simulate a cron run:
 
 ```bash
 curl "http://127.0.0.1:8787/__scheduled?cron=*/1%20*%20*%20*%20*"
@@ -93,65 +70,60 @@ curl "http://127.0.0.1:8787/__scheduled?cron=*/1%20*%20*%20*%20*"
 Deploy to **staging**:
 
 ```bash
-npm run deploy:sync-updates:staging
+npm run deploy:staging
 ```
 
 Deploy to **production**:
 
 ```bash
-npm run deploy:sync-updates:prod
+npm run deploy:prod
 ```
-
-Repeat for any other worker (`create-daily`, `provide-liquidity`, etc.).
 
 ---
 
 ## 🔑 Secrets
 
-Each Worker requires:
+The Worker requires:
 
-* `INTERNAL_API_KEY` → the shared secret for the Netlify API routes
-* `ENABLED` (optional) → feature flag toggle (`true`/`false`)
+* `INTERNAL_API_KEY` → shared secret for Netlify internal API routes
 
 Set them with Wrangler:
 
 ```bash
 # staging
-wrangler secret put INTERNAL_API_KEY --env staging --config sync-chronicles-updates/wrangler.jsonc
-wrangler secret put ENABLED --env staging --config sync-chronicles-updates/wrangler.jsonc
+wrangler secret put INTERNAL_API_KEY --env staging
 
 # production
-wrangler secret put INTERNAL_API_KEY --env production --config sync-chronicles-updates/wrangler.jsonc
-wrangler secret put ENABLED --env production --config sync-chronicles-updates/wrangler.jsonc
+wrangler secret put INTERNAL_API_KEY --env production
 ```
 
 ---
 
-## ⏯ Enabling / Disabling Workers (Feature Flag)
+## ⏯ Enabling / Disabling Jobs (Feature Flag)
 
-Workers check the `ENABLED` secret at runtime:
+The Worker checks the `ENABLED` secret at runtime:
 
 ```ts
-if ((env.ENABLED ?? "true") !== "true") {
+if ((env.ENABLED ?? "false") !== "true") {
   console.log(`[disabled] skipping cron ${ev.cron}`)
   return
 }
 ```
 
-* **Disable a prod worker:**
+* **Disable all jobs in production (preferably via UI) or:**
 
   ```bash
-  wrangler secret put ENABLED --env production --config sync-chronicles-updates/wrangler.jsonc
+  wrangler secret put ENABLED --env production
   # enter: false
   ```
-* **Enable again:**
+* **Enable again (preferably via UI) or:**
 
   ```bash
-  wrangler secret put ENABLED --env production --config sync-chronicles-updates/wrangler.jsonc
+  wrangler secret put ENABLED --env production
   # enter: true
   ```
 
-This does not require a redeploy. Secrets update immediately.
+No redeploy required. Secrets update immediately.
 
 ---
 
@@ -162,30 +134,38 @@ This does not require a redeploy. Secrets update immediately.
 | createDailyChronicles       | `0,30 6-23 * * *`       | `/api/internal/create-daily-chronicles`       |
 | processIncompleteChronicles | `15 7-9 * * *`          | `/api/internal/process-incomplete-chronicles` |
 | syncChroniclesUpdates       | `*/1 * * * *` (1 min)   | `/api/internal/sync-chronicles-updates`       |
-| syncUserStakes              | `*/2 * * * *` (2 min)   | `/api/internal/sync-user-stakes`              |
+| syncUserStakes              | `*/1 * * * *` (1 min)   | `/api/internal/sync-user-stakes`              |
 | provideLiquidity            | `0 * * * *` (hourly)    | `/api/internal/provide-liquidity`             |
 | shieldClean                 | `*/15 * * * *` (15 min) | `/api/internal/shield-clean`                  |
 | recordDacPerformance        | `*/15 * * * *` (15 min) | `/api/internal/record-dac-performance`        |
 
-All schedules are in **UTC**. If you need Europe/Dublin times, adjust cron expressions accordingly.
+All schedules are in **UTC**.
+(Cloudflare’s free plan allows up to **5 distinct cron expressions**; `syncUserStakes` was consolidated into `*/1 * * * *`.)
 
 ---
 
 ## 📖 Monitoring & Logs
 
-* **Local tailing:**
+* **Local tailing (staging):**
 
   ```bash
-  wrangler tail --env staging --config sync-chronicles-updates/wrangler.jsonc
+  npm run logs:staging
   ```
-* **Dashboard:** Cloudflare → Workers → \[Worker] → **Logs**
+* **Local tailing (production):**
+
+  ```bash
+  npm run logs:prod
+  ```
+* **Cloudflare Dashboard:** Workers → dc-cron → **Logs**
 * Optionally enable **Logpush** to ship logs to S3, BigQuery, etc.
 
 ---
 
 ## ✅ Best Practices
 
-* Keep endpoints **idempotent** so reruns don’t cause duplication.
-* Handle errors gracefully in your Netlify API handlers (Workers only fire the POST).
-* For staging, use shorter cadences (1–2 min). For prod, align with your business schedule.
-* Use `ENABLED=false` when you need to temporarily pause jobs without redeploying.
+* Keep internal endpoints **idempotent** so reruns don’t cause duplication.
+* Handle errors gracefully in Netlify API handlers (the Worker only fires the POST).
+* Use staging for rapid iterations (short cadences).
+* Use `ENABLED=false` to temporarily pause jobs without redeploying.
+
+---

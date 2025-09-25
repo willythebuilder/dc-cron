@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dc-cron",
+  "main": "src/worker.ts",
+  "compatibility_date": "2024-11-01",
+
+  // Dev/default triggers (local or if you omit --env). Feel free to simplify for local testing.
+  "triggers": {
+    "crons": [
+      "0,30 6-23 * * *", //["createDailyChronicles"]
+      "15 7-9 * * *", //["processIncompleteChronicles"]
+      "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes"]
+      "0 * * * *", //["provideLiquidity"]
+      "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
+    ]
+  },
+
+  // Non-secret defaults for local dev
+  "vars": {
+    "BASE_URL": "http://localhost:8888/",
+    "ENABLED": "true"
+  },
+
+  "observability": { "enabled": true },
+
+  "env": {
+    "staging": {
+      "triggers": {
+        "crons": [
+          "0,30 6-23 * * *", //["createDailyChronicles"]
+          "15 7-9 * * *", //["processIncompleteChronicles"]
+          "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes"]
+          "0 * * * *", //["provideLiquidity"]
+          "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
+        ]
+      },
+      "vars": {
+        "BASE_URL": "https://staging-daichronicles.netlify.app",
+        "ENABLED": "false"
+      }
+    },
+    "production": {
+      "triggers": {
+        "crons": [
+          "0,30 6-23 * * *", //["createDailyChronicles"]
+          "15 7-9 * * *", //["processIncompleteChronicles"]
+          "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes"]
+          "0 * * * *", //["provideLiquidity"]
+          "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
+        ]
+      },
+      "vars": {
+        "BASE_URL": "https://daichronicles.io",
+        "ENABLED": "false"
+      }
+    }
+  }
+}
