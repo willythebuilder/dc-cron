@@ -18,7 +18,8 @@
   // Non-secret defaults for local dev
   "vars": {
     "BASE_URL": "http://localhost:8888/",
-    "ENABLED": "true"
+    "ENABLED": "true",
+    "INTERNAL_API_KEY": "1418b63e-54e3-4543-a7e3-55340bebeb61"
   },
 
   "observability": { "enabled": true },
