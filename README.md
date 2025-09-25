@@ -55,13 +55,29 @@ Run the Worker locally with cron simulation:
 npm run dev
 ```
 
-Wrangler starts at `http://127.0.0.1:8787`.
+Wrangler starts your Worker at http://127.0.0.1:8787, but **cron jobs don’t fire automatically** in dev mode.
+You need to **manually simulate a tick** by calling the special __scheduled endpoint.
 
-Simulate a cron run:
+Examples (open in browser or curl):
 
 ```bash
+# every minute
 curl "http://127.0.0.1:8787/__scheduled?cron=*/1%20*%20*%20*%20*"
+
+# 0 and 30 past each hour from 06–23
+curl "http://127.0.0.1:8787/__scheduled?cron=0,30%206-23%20*%20*%20*"
+
+# 15 past hours 7–9
+curl "http://127.0.0.1:8787/__scheduled?cron=15%207-9%20*%20*%20*"
+
+# hourly at :00
+curl "http://127.0.0.1:8787/__scheduled?cron=0%20*%20*%20*%20*"
+
+# every 15 minutes
+curl "http://127.0.0.1:8787/__scheduled?cron=*/15%20*%20*%20*%20*"
+
 ```
+> ⚠️ The cron string in the URL must exactly match one of the schedules in your CRON_TO_JOBS mapping. Otherwise, no jobs will run.
 
 ---
 
