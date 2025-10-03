@@ -20,7 +20,7 @@
     "BASE_URL": "http://localhost:8888/",
     "ENABLED": "true",
     "INTERNAL_API_KEY": "1418b63e-54e3-4543-a7e3-55340bebeb61",
-        "SLACK_WEBHOOK_URL": "" // optional, for job failure alerts
+    "SLACK_WEBHOOK_URL": "" // optional, for job failure alerts
   },
 
   "observability": { "enabled": true },
