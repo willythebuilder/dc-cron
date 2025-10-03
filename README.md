@@ -102,6 +102,7 @@ npm run deploy:prod
 The Worker requires:
 
 * `INTERNAL_API_KEY` → shared secret for Netlify internal API routes
+* `SLACK_WEBHOOK_URL` (optional) → for job failure alerts
 
 Set them with Wrangler:
 
@@ -111,6 +112,10 @@ wrangler secret put INTERNAL_API_KEY --env staging
 
 # production
 wrangler secret put INTERNAL_API_KEY --env production
+
+# optionally, set Slack webhook URL
+wrangler secret put SLACK_WEBHOOK_URL --env staging
+wrangler secret put SLACK_WEBHOOK_URL --env production
 ```
 
 No redeploy required. Secrets update immediately.
