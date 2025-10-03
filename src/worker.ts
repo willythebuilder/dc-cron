@@ -20,6 +20,7 @@ export interface Env {
   BASE_URL: string; // set via wrangler.jsonc per env
   INTERNAL_API_KEY: string; // secret: wrangler secret put INTERNAL_API_KEY --env <env>
   ENABLED: string; // set via wrangler.jsonc per env: "false" (default) or "true" to run all
+  SLACK_WEBHOOK_URL?: string; // optional, for job failure alerts
 }
 
 // Endpoint paths (relative to BASE_URL)
@@ -52,29 +53,119 @@ function fullUrl(env: Env, path: string) {
   return `${env.BASE_URL.replace(/\/+$/, '')}${path}`;
 }
 
-async function runJob(job: JobKey, env: Env): Promise<void> {
+/** --- Slack helpers --- */
+
+function shouldAlert(status?: number) {
+  // Only suppress alerts for HTTP 503; network errors (no status) should alert.
+  return status !== 700;
+}
+
+async function postSlack(webhook: string, payload: unknown): Promise<void> {
+  try {
+    const res = await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      console.error(`[${nowISO()}] Slack webhook failed status=${res.status}`);
+    }
+  } catch (e: any) {
+    console.error(`[${nowISO()}] Slack webhook error: ${e?.message ?? e}`);
+  }
+}
+
+function slackTextForFailure(opts: {
+  cron: string;
+  job: JobKey;
+  url: string;
+  status?: number | undefined;
+  ms: number;
+  baseUrl: string;
+  timestampISO: string;
+  body?: string | undefined;
+}) {
+  const statusStr =
+    opts.status !== undefined ? String(opts.status) : 'network error';
+  const bodySnippet = opts.body
+    ? `\n• *Body (trimmed)*:\n\`\`\`\n${opts.body}\n\`\`\``
+    : '';
+  return (
+    `:rotating_light: *Cron job failed* (${opts.cron})\n` +
+    `• *Job*: ${opts.job}\n` +
+    `• *Status*: ${statusStr}\n` +
+    `• *Duration*: ${opts.ms}ms\n` +
+    `• *When*: ${opts.timestampISO}\n` +
+    `• *URL*: ${opts.url}\n` +
+    `• *BASE_URL*: ${opts.baseUrl}` +
+    bodySnippet
+  );
+}
+
+/** --- Job runner returns structured result (no throw) --- */
+
+type JobResultOk = {
+  job: JobKey;
+  ok: true;
+  status: number;
+  ms: number;
+  url: string;
+};
+
+type JobResultErr = {
+  job: JobKey;
+  ok: false;
+  status?: number;
+  ms: number;
+  url: string;
+  error: string;
+  body?: string;
+};
+
+type JobResult = JobResultOk | JobResultErr;
+
+async function runJob(job: JobKey, env: Env): Promise<JobResult> {
   const url = fullUrl(env, JOB_ENDPOINT[job]);
   const started = Date.now();
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Internal-Authorization': env.INTERNAL_API_KEY }
-  });
-  const ms = Date.now() - started;
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    // No retry by design; just log
-    console.error(
-      `[${nowISO()}] job=${job} status=${
-        res.status
-      } durMs=${ms} url=${url} body=${body.slice(0, 500)}`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Internal-Authorization': env.INTERNAL_API_KEY }
+    });
+    const ms = Date.now() - started;
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      const trimmed = body.slice(0, 1500); // keep Slack friendly
+      console.error(
+        `[${nowISO()}] job=${job} status=${
+          res.status
+        } durMs=${ms} url=${url} body=${trimmed}`
+      );
+      return {
+        job,
+        ok: false,
+        status: res.status,
+        ms,
+        url,
+        error: `HTTP ${res.status}`,
+        body: trimmed
+      };
+    }
+
+    console.log(
+      `[${nowISO()}] job=${job} OK status=${res.status} durMs=${ms} url=${url}`
     );
-    throw new Error(`Job ${job} failed with HTTP ${res.status}`);
+    return { job, ok: true, status: res.status, ms, url };
+  } catch (e: any) {
+    const ms = Date.now() - started;
+    const message = e?.message ?? String(e);
+    console.error(
+      `[${nowISO()}] job=${job} fetch error durMs=${ms} url=${url} err=${message}`
+    );
+    return { job, ok: false, ms, url, error: message };
   }
-
-  console.log(
-    `[${nowISO()}] job=${job} OK status=${res.status} durMs=${ms} url=${url}`
-  );
 }
 
 export default {
@@ -119,15 +210,48 @@ export default {
       return;
     }
 
-    // Run all jobs for this tick. If one fails, we still attempt the others.
+    // Run all jobs for this tick.
     ctx.waitUntil(
       (async () => {
-        const results = await Promise.allSettled(jobs.map(j => runJob(j, env)));
-        const failed = results.filter(r => r.status === 'rejected');
-        if (failed.length > 0) {
-          // Throwing here marks the cron run as failed in logs/metrics (useful for alerting)
+        const results = await Promise.all(jobs.map(j => runJob(j, env)));
+
+        // Send Slack alerts for non-503 failures (if webhook configured).
+        const webhook = env.SLACK_WEBHOOK_URL?.trim();
+        if (webhook) {
+          const alerts = results
+            .filter((r): r is JobResultErr => !r.ok)
+            .filter(r => shouldAlert(r.status))
+            .map(r =>
+              postSlack(webhook, {
+                text: slackTextForFailure({
+                  cron: ev.cron,
+                  job: r.job,
+                  url: r.url,
+                  status: r.status,
+                  ms: r.ms,
+                  baseUrl: env.BASE_URL,
+                  timestampISO: nowISO(),
+                  body: r.body
+                })
+              })
+            );
+
+          if (alerts.length > 0) {
+            await Promise.allSettled(alerts);
+          }
+        }
+
+        // Mark the cron as failed in logs/metrics if any job failed (including 503s).
+        const anyFailed = results.some(r => !r.ok);
+        if (anyFailed) {
+          const non503Failed = results
+            .filter((r): r is JobResultErr => !r.ok)
+            .map(r => r.status ?? 0)
+            .filter(s => s !== 503).length;
           throw new Error(
-            `Some jobs failed for cron=${ev.cron}: ${failed.length}/${jobs.length}`
+            `Some jobs failed for cron=${ev.cron}: ${
+              results.filter(r => !r.ok).length
+            }/${results.length} (non-503 failures=${non503Failed})`
           );
         }
       })()

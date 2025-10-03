@@ -37,7 +37,8 @@
       },
       "vars": {
         "BASE_URL": "https://staging-daichronicles.netlify.app",
-        "ENABLED": "false"
+        "ENABLED": "false",
+        "SLACK_WEBHOOK_URL": "" // optional, for job failure alerts
       }
     },
     "production": {
@@ -52,7 +53,8 @@
       },
       "vars": {
         "BASE_URL": "https://daichronicles.io",
-        "ENABLED": "false"
+        "ENABLED": "false",
+        "SLACK_WEBHOOK_URL": "" // optional, for job failure alerts
       }
     }
   }

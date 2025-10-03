@@ -113,6 +113,8 @@ wrangler secret put INTERNAL_API_KEY --env staging
 wrangler secret put INTERNAL_API_KEY --env production
 ```
 
+No redeploy required. Secrets update immediately.
+
 ---
 
 ## ⏯ Enabling / Disabling Jobs (Feature Flag)
@@ -126,20 +128,17 @@ if ((env.ENABLED ?? "false") !== "true") {
 }
 ```
 
-* **Disable all jobs in production (preferably via UI) or:**
+* **Enable/Disable all jobs in staging/production (preferably via UI) or:**
 
-  ```bash
-  wrangler secret put ENABLED --env production
-  # enter: false
-  ```
-* **Enable again (preferably via UI) or:**
+- update the value in wrangler config and redeploy:
 
-  ```bash
-  wrangler secret put ENABLED --env production
-  # enter: true
-  ```
+```bash
+# for staging
+npx wrangler deploy --env staging
 
-No redeploy required. Secrets update immediately.
+# for production
+npx wrangler deploy --env production
+```
 
 ---
 
