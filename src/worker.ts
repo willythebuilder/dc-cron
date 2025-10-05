@@ -57,7 +57,7 @@ function fullUrl(env: Env, path: string) {
 
 function shouldAlert(status?: number) {
   // Only suppress alerts for HTTP 503; network errors (no status) should alert.
-  return status !== 700;
+  return status !== 503;
 }
 
 async function postSlack(webhook: string, payload: unknown): Promise<void> {
