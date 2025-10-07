@@ -1,11 +1,13 @@
 /**
  * Single Worker handling all DaiChronicles cron jobs.
- * - Uses BASE_URL (per env) + endpoint paths
+ * - Uses BASE_URL\WEB_URL (per env) + endpoint paths
  * - Uses INTERNAL_API_KEY header for auth
  * - Global feature flag ENABLED ("true"/"false")
  *
  * Cron → Jobs mapping (multiple jobs may share the same expression)
  */
+
+type Platform = 'worker' | 'web';
 
 type JobKey =
   | 'createDailyChronicles'
@@ -14,43 +16,75 @@ type JobKey =
   | 'syncUserStakes'
   | 'provideLiquidity'
   | 'shieldClean'
-  | 'recordDacPerformance';
+  | 'recordDacPerformance'
+  | 'healthz';
 
 export interface Env {
   BASE_URL: string; // set via wrangler.jsonc per env
+  WEB_URL: string; // set via wrangler.jsonc per env
   INTERNAL_API_KEY: string; // secret: wrangler secret put INTERNAL_API_KEY --env <env>
   ENABLED: string; // set via wrangler.jsonc per env: "false" (default) or "true" to run all
   SLACK_WEBHOOK_URL?: string; // optional, for job failure alerts
 }
 
-// Endpoint paths (relative to BASE_URL)
-const JOB_ENDPOINT: Record<JobKey, string> = {
-  createDailyChronicles: '/api/internal/create-daily-chronicles',
-  processIncompleteChronicles: '/api/internal/process-incomplete-chronicles',
-  syncChroniclesUpdates: '/api/internal/sync-chronicles-updates',
-  syncUserStakes: '/api/internal/sync-user-stakes',
-  provideLiquidity: '/api/internal/provide-liquidity',
-  shieldClean: '/api/internal/shield-clean',
-  recordDacPerformance: '/api/internal/record-dac-performance'
+// Endpoint paths (relative to BASE_URL and/or WEB_URL)
+const JOB_ENDPOINT: Record<JobKey, { method: string; path: string }> = {
+  createDailyChronicles: {
+    method: 'POST',
+    path: '/api/internal/create-daily-chronicles'
+  },
+  processIncompleteChronicles: {
+    method: 'POST',
+    path: '/api/internal/process-incomplete-chronicles'
+  },
+  syncChroniclesUpdates: {
+    method: 'POST',
+    path: '/api/internal/sync-chronicles-updates'
+  },
+  syncUserStakes: { method: 'POST', path: '/api/internal/sync-user-stakes' },
+  provideLiquidity: { method: 'POST', path: '/api/internal/provide-liquidity' },
+  shieldClean: { method: 'POST', path: '/api/internal/shield-clean' },
+  recordDacPerformance: {
+    method: 'POST',
+    path: '/api/internal/record-dac-performance'
+  },
+  healthz: { method: 'GET', path: '/api/healthz' }
 };
 
 // Cron expressions → which jobs to run on that tick
 // NOTE: if two jobs share a cron (e.g. */15), both run (in parallel)
-const CRON_TO_JOBS: Record<string, JobKey[]> = {
+const WORKER_CRON_TO_JOBS: Record<string, JobKey[]> = {
   '0,30 6-23 * * *': ['createDailyChronicles'],
   '15 7-9 * * *': ['processIncompleteChronicles'],
-  '*/1 * * * *': ['syncChroniclesUpdates', 'syncUserStakes'],
+  '*/1 * * * *': ['syncChroniclesUpdates', 'syncUserStakes', 'healthz'],
   '0 * * * *': ['provideLiquidity'],
   '*/15 * * * *': ['shieldClean', 'recordDacPerformance']
+};
+
+const WEB_CRON_TO_JOBS: Record<string, JobKey[]> = {
+  '0,30 6-23 * * *': [],
+  '15 7-9 * * *': [],
+  '*/1 * * * *': ['healthz'],
+  '0 * * * *': [],
+  '*/15 * * * *': []
 };
 
 function nowISO() {
   return new Date().toISOString();
 }
 
-function fullUrl(env: Env, path: string) {
+function fullUrl(
+  platform: Platform,
+  env: Env,
+  { method, path }: { method: string; path: string }
+) {
   // Ensure no double slash
-  return `${env.BASE_URL.replace(/\/+$/, '')}${path}`;
+  const baseUrl = platform === 'worker' ? env.BASE_URL : env.WEB_URL;
+  return {
+    url: `${baseUrl.replace(/\/+$/, '')}${path}`,
+    method: method,
+    baseUrl
+  };
 }
 
 /** --- Slack helpers --- */
@@ -110,6 +144,7 @@ type JobResultOk = {
   status: number;
   ms: number;
   url: string;
+  baseUrl: string;
 };
 
 type JobResultErr = {
@@ -118,20 +153,27 @@ type JobResultErr = {
   status?: number;
   ms: number;
   url: string;
+  baseUrl: string;
   error: string;
   body?: string;
 };
 
 type JobResult = JobResultOk | JobResultErr;
 
-async function runJob(job: JobKey, env: Env): Promise<JobResult> {
-  const url = fullUrl(env, JOB_ENDPOINT[job]);
+async function runJob(
+  platform: Platform,
+  job: JobKey,
+  env: Env
+): Promise<JobResult> {
+  const { url, method, baseUrl } = fullUrl(platform, env, JOB_ENDPOINT[job]);
   const started = Date.now();
 
   try {
     const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Internal-Authorization': env.INTERNAL_API_KEY }
+      method: method,
+      ...(JOB_ENDPOINT[job].path.startsWith('/api/internal/')
+        ? { headers: { 'Internal-Authorization': env.INTERNAL_API_KEY } }
+        : {})
     });
     const ms = Date.now() - started;
 
@@ -149,6 +191,7 @@ async function runJob(job: JobKey, env: Env): Promise<JobResult> {
         status: res.status,
         ms,
         url,
+        baseUrl,
         error: `HTTP ${res.status}`,
         body: trimmed
       };
@@ -157,14 +200,14 @@ async function runJob(job: JobKey, env: Env): Promise<JobResult> {
     console.log(
       `[${nowISO()}] job=${job} OK status=${res.status} durMs=${ms} url=${url}`
     );
-    return { job, ok: true, status: res.status, ms, url };
+    return { job, ok: true, status: res.status, ms, url, baseUrl };
   } catch (e: any) {
     const ms = Date.now() - started;
     const message = e?.message ?? String(e);
     console.error(
       `[${nowISO()}] job=${job} fetch error durMs=${ms} url=${url} err=${message}`
     );
-    return { job, ok: false, ms, url, error: message };
+    return { job, ok: false, ms, url, error: message, baseUrl };
   }
 }
 
@@ -203,17 +246,23 @@ export default {
       return;
     }
 
-    const jobs = CRON_TO_JOBS[ev.cron];
-    if (!jobs || jobs.length === 0) {
+    const workerJobs = WORKER_CRON_TO_JOBS[ev.cron];
+    if (!workerJobs || workerJobs.length === 0) {
       // This can happen if local triggers differ from env or a new cron was added but not mapped yet
       console.error(`[${nowISO()}] no jobs mapped for cron="${ev.cron}"`);
       return;
     }
 
+    const webJobs = WEB_CRON_TO_JOBS[ev.cron] || [];
+
     // Run all jobs for this tick.
     ctx.waitUntil(
       (async () => {
-        const results = await Promise.all(jobs.map(j => runJob(j, env)));
+        const allJobs = [
+          ...workerJobs.map(j => runJob('worker', j, env)),
+          ...webJobs.map(j => runJob('web', j, env))
+        ];
+        const results = await Promise.all(allJobs);
 
         // Send Slack alerts for non-503 failures (if webhook configured).
         const webhook = env.SLACK_WEBHOOK_URL?.trim();
@@ -229,7 +278,7 @@ export default {
                   url: r.url,
                   status: r.status,
                   ms: r.ms,
-                  baseUrl: env.BASE_URL,
+                  baseUrl: r.baseUrl,
                   timestampISO: nowISO(),
                   body: r.body
                 })

@@ -18,6 +18,7 @@
   // Non-secret defaults for local dev
   "vars": {
     "BASE_URL": "http://localhost:8888/",
+    "WEB_URL": "http://localhost:8888/",
     "ENABLED": "true",
     "INTERNAL_API_KEY": "1418b63e-54e3-4543-a7e3-55340bebeb61",
     "SLACK_WEBHOOK_URL": "" // optional, for job failure alerts
@@ -31,13 +32,14 @@
         "crons": [
           "0,30 6-23 * * *", //["createDailyChronicles"]
           "15 7-9 * * *", //["processIncompleteChronicles"]
-          "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes"]
+          "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes", "healthz"]
           "0 * * * *", //["provideLiquidity"]
           "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
         ]
       },
       "vars": {
         "BASE_URL": "https://dc-platform-stg-api-578323882369.us-east5.run.app",
+        "WEB_URL": "https://staging-daichronicles.netlify.app",
         "ENABLED": "false"
       }
     },
@@ -46,13 +48,14 @@
         "crons": [
           "0,30 6-23 * * *", //["createDailyChronicles"]
           "15 7-9 * * *", //["processIncompleteChronicles"]
-          "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes"]
+          "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes", "healthz"]
           "0 * * * *", //["provideLiquidity"]
           "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
         ]
       },
       "vars": {
         "BASE_URL": "https://dc-platform-stg-api-578323882369.us-east5.run.app",
+        "WEB_URL": "https://daichronicles.io",
         "ENABLED": "false"
       }
     }
