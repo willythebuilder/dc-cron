@@ -39,7 +39,7 @@
       },
       "vars": {
         "BASE_URL": "https://dc-platform-stg-api-578323882369.us-east5.run.app",
-        "WEB_URL": "https://staging-daichronicles.netlify.app",
+        "WEB_URL": "https://sepolia.daichronicles.io",
         "ENABLED": "false"
       }
     },

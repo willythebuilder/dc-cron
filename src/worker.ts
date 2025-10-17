@@ -89,9 +89,16 @@ function fullUrl(
 
 /** --- Slack helpers --- */
 
-function shouldAlert(status?: number) {
+function shouldAlert(jobResult?: JobResult) {
+  if (!jobResult) return true; // No result → alert by default
+
+  const { status, job } = jobResult;
+
   // Only suppress alerts for HTTP 503, 409; network errors (no status) should alert.
-  return status !== 503 && status !== 409; // also ignore 409 conflict errors (e.g. createDailyChronicles when already run)
+  if (status === 503 || status === 409) return false;
+  if (status === 524 && job === 'provideLiquidity') return false;
+
+  return true;
 }
 
 async function postSlack(webhook: string, payload: unknown): Promise<void> {
@@ -269,7 +276,7 @@ export default {
         if (webhook) {
           const alerts = results
             .filter((r): r is JobResultErr => !r.ok)
-            .filter(r => shouldAlert(r.status))
+            .filter(r => shouldAlert(r))
             .map(r =>
               postSlack(webhook, {
                 text: slackTextForFailure({
@@ -295,8 +302,7 @@ export default {
         if (anyFailed) {
           const unexpectedFailed = results
             .filter((r): r is JobResultErr => !r.ok)
-            .map(r => r.status ?? 0)
-            .filter(s => shouldAlert(s)).length;
+            .filter(r => shouldAlert(r)).length;
           throw new Error(
             `Some jobs failed for cron=${ev.cron}: ${
               results.filter(r => !r.ok).length
