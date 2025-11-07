@@ -54,7 +54,7 @@
         ]
       },
       "vars": {
-        "BASE_URL": "https://dc-platform-stg-api-578323882369.us-east5.run.app",
+        "BASE_URL": "https://platform.daichronicles.io",
         "WEB_URL": "https://daichronicles.io",
         "ENABLED": "false"
       }
