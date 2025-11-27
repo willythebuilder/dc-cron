@@ -7,8 +7,8 @@
   // Dev/default triggers (local or if you omit --env). Feel free to simplify for local testing.
   "triggers": {
     "crons": [
-      "0,30 6-23 * * *", //["createDailyChronicles"]
-      "15 7-9 * * *", //["processIncompleteChronicles"]
+      "0,30 12-23 * * *", //["createDailyChronicles"]
+      "15 13-15 * * *", //["processIncompleteChronicles"]
       "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes"]
       "0 * * * *", //["provideLiquidity"]
       "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
@@ -30,8 +30,8 @@
     "staging": {
       "triggers": {
         "crons": [
-          "0,30 6-23 * * *", //["createDailyChronicles"]
-          "15 7-9 * * *", //["processIncompleteChronicles"]
+          "0,30 12-23 * * *", //["createDailyChronicles"]
+          "15 13-15 * * *", //["processIncompleteChronicles"]
           "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes", "healthz"]
           "0 * * * *", //["provideLiquidity"]
           "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
@@ -46,8 +46,8 @@
     "production": {
       "triggers": {
         "crons": [
-          "0,30 6-23 * * *", //["createDailyChronicles"]
-          "15 7-9 * * *", //["processIncompleteChronicles"]
+          "0,30 12-23 * * *", //["createDailyChronicles"]
+          "15 13-15 * * *", //["processIncompleteChronicles"]
           "*/1 * * * *", //["syncChroniclesUpdates", "syncUserStakes", "healthz"]
           "0 * * * *", //["provideLiquidity"]
           "*/15 * * * *" //["shieldClean", "recordDacPerformance"]
