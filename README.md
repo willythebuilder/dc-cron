@@ -151,8 +151,8 @@ npx wrangler deploy --env production
 
 | Job                         | Schedule                | Endpoint                                      |
 | --------------------------- | ----------------------- | --------------------------------------------- |
-| createDailyChronicles       | `0,30 6-23 * * *`       | `/api/internal/create-daily-chronicles`       |
-| processIncompleteChronicles | `15 7-9 * * *`          | `/api/internal/process-incomplete-chronicles` |
+| createDailyChronicles       | `0,30 12-23 * * *`       | `/api/internal/create-daily-chronicles`       |
+| processIncompleteChronicles | `15 13-15 * * *`          | `/api/internal/process-incomplete-chronicles` |
 | syncChroniclesUpdates       | `*/1 * * * *` (1 min)   | `/api/internal/sync-chronicles-updates`       |
 | syncUserStakes              | `*/1 * * * *` (1 min)   | `/api/internal/sync-user-stakes`              |
 | provideLiquidity            | `0 * * * *` (hourly)    | `/api/internal/provide-liquidity`             |

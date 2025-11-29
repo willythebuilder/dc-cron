@@ -54,16 +54,16 @@ const JOB_ENDPOINT: Record<JobKey, { method: string; path: string }> = {
 // Cron expressions → which jobs to run on that tick
 // NOTE: if two jobs share a cron (e.g. */15), both run (in parallel)
 const WORKER_CRON_TO_JOBS: Record<string, JobKey[]> = {
-  '0,30 6-23 * * *': ['createDailyChronicles'],
-  '15 7-9 * * *': ['processIncompleteChronicles'],
+  '0,30 12-23 * * *': ['createDailyChronicles'],
+  '15 13-15 * * *': ['processIncompleteChronicles'],
   '*/1 * * * *': ['syncChroniclesUpdates', 'syncUserStakes', 'healthz'],
   '0 * * * *': ['provideLiquidity'],
   '*/15 * * * *': ['shieldClean', 'recordDacPerformance']
 };
 
 const WEB_CRON_TO_JOBS: Record<string, JobKey[]> = {
-  '0,30 6-23 * * *': [],
-  '15 7-9 * * *': [],
+  '0,30 12-23 * * *': [],
+  '15 13-15 * * *': [],
   '*/1 * * * *': ['healthz'],
   '0 * * * *': [],
   '*/15 * * * *': []
